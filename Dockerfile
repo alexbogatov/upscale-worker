@@ -2,7 +2,7 @@ FROM node:20-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. System packages, Chrome runtime libraries, tools, Xvfb, and Vulkan
+# 1. System packages, Chrome runtime libraries, tools, Xvfb, Vulkan, and EGL/GLVND dispatchers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget curl gnupg \
     fonts-liberation \
@@ -37,5 +37,6 @@ COPY upscaler/ ./upscaler/
 RUN chmod +x entrypoint.sh
 
 ENV DISPLAY=:99
-ENV XDG_RUNTIME_DIR=/tmp
+ENV XDG_RUNTIME_DIR=/tmp/runtime-root
+
 ENTRYPOINT ["./entrypoint.sh"]

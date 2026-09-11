@@ -68,28 +68,31 @@ else
     echo "[Billing Warning] Could not initialize session tracking."
 fi
 
-# 3. Start Xvfb virtual display
+# 3. Setup isolated XDG runtime directory and start Xvfb
+export XDG_RUNTIME_DIR=/tmp/runtime-root
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+
 echo "[Display] Starting Xvfb on :99..."
 rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
 Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
 XVFB_PID=$!
 
-until [ -e /tmp/.X11-unix/X99 ]; do
+until [ -S /tmp/.X11-unix/X99 ]; do
     sleep 0.1
 done
 echo "[Display] Xvfb is ready on DISPLAY=:99."
 
 # 3b. Verify Vulkan/GPU is visible to the renderer
 echo "[Display] Verifying Vulkan ICD..."
-if ! env -u DISPLAY XDG_RUNTIME_DIR=/tmp vulkaninfo --summary 2>/dev/null | grep -q "NVIDIA"; then
+if ! env -u DISPLAY XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" vulkaninfo --summary 2>/dev/null | grep -q "NVIDIA"; then
     echo "[Display Warning] Vulkan device not detected — WebGPU may fall back to software."
+else
+    echo "[Display] NVIDIA Vulkan device verified successfully."
 fi
 
 # 4. Launch Worker Loop
 export DISPLAY=:99
-export XDG_RUNTIME_DIR=/tmp
-mkdir -p /tmp
-chmod 700 /tmp
 node worker.js
 WORKER_EXIT_CODE=$?
 
@@ -103,8 +106,8 @@ JOBS_PROCESSED=0
 TOTAL_GEN_TIME=0
 
 if [ -f "$STATS_FILE" ]; then
-    JOBS_PROCESSED=$(node -e "try { console.log(JSON.parse(fs.readFileSync('$STATS_FILE')).jobs_processed || 0); } catch(_) { console.log(0); }")
-    TOTAL_GEN_TIME=$(node -e "try { console.log(JSON.parse(fs.readFileSync('$STATS_FILE')).total_generation_time_sec || 0); } catch(_) { console.log(0); }")
+    JOBS_PROCESSED=$(node -e "const fs = require('fs'); try { console.log(JSON.parse(fs.readFileSync('$STATS_FILE')).jobs_processed || 0); } catch(_) { console.log(0); }")
+    TOTAL_GEN_TIME=$(node -e "const fs = require('fs'); try { console.log(JSON.parse(fs.readFileSync('$STATS_FILE')).total_generation_time_sec || 0); } catch(_) { console.log(0); }")
 fi
 
 OFF_PAYLOAD=$(cat <<EOF
