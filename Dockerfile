@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 \
     libxfixes3 libxkbcommon0 libxrandr2 libxshmfence1 \
     libvulkan1 vulkan-tools \
+    libegl1 libglvnd0 libglx0 \
     xdg-utils xvfb procps \
  && rm -rf /var/lib/apt/lists/*
 
@@ -36,4 +37,5 @@ COPY upscaler/ ./upscaler/
 RUN chmod +x entrypoint.sh
 
 ENV DISPLAY=:99
+ENV XDG_RUNTIME_DIR=/tmp
 ENTRYPOINT ["./entrypoint.sh"]
