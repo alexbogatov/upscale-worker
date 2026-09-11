@@ -179,11 +179,11 @@ const launch_browser = async () => {
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
+      '--disable-web-security',
       '--use-angle=vulkan',
       '--enable-features=Vulkan',
       '--disable-vulkan-surface',
       '--enable-unsafe-webgpu',
-      '--disable-web-security',
     ]
   });
 
@@ -494,13 +494,15 @@ const main = async () => {
       consecutive_failures = 0;
       await sync_stats_file();
 
-      console.log(`[worker] Job [${job_id}] completed in ${generation_time.toFixed(2)}s -> ${r2_url}`);
+    //   console.log(`[worker] Job [${job_id}] completed in ${generation_time.toFixed(2)}s -> ${r2_url}`);
+      console.log(`\x1b[32m✔ [worker] Job [${job_id}] upscaled ${produced_filename} in ${generation_time.toFixed(2)}s\x1b[0m -> ${r2_url}`);
+
     } catch (err) {
       console.error(`[worker] Job [${job_id}] failed:`, err.message);
       consecutive_failures++;
       await fail_job(job_id, err.message);
 
-      if (consecutive_failures >= 5) {
+      if (consecutive_failures >= 50) {
         console.error('[worker] FATAL: 5 consecutive failures. Exiting.');
         process.exit(1);
       }
