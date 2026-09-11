@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anime4K CNN-2x-28 Upscaler</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; background: #0b0d12; color: #e6e8ec; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 16px; }
+  #controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  #status, #progress, #eta { font-size: 13px; color: #8a909b; }
+  input[type=file] { color: #e6e8ec; }
+  #preview { max-width: 100%; display: block; background: #000; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Anime4K CNN-2x-28 Upscaler</h1>
+
+<div id="controls">
+  <input type="file" id="file" accept="video/mp4,video/*">
+  <span id="status">idle</span>
+  <span id="progress"></span>
+  <span id="eta"></span>
+</div>
+
+<canvas id="preview"></canvas>
+
+<!-- 1) Chunk-capture shim: MUST run before websr.js. -->
+<script>
+  window.webpackChunkfree_video_upscaler =
+    window.webpackChunkfree_video_upscaler || [];
+  const _origPush = window.webpackChunkfree_video_upscaler.push.bind(
+    window.webpackChunkfree_video_upscaler
+  );
+  window.webpackChunkfree_video_upscaler.push = function (chunk) {
+    if (Array.isArray(chunk) && Array.isArray(chunk[0]) && chunk[0].includes(104)) {
+      window.__websrModules = chunk[1];
+    }
+    return _origPush(chunk);
+  };
+</script>
+
+<script src="./vendor/websr.js"></script>
+<script src="./vendor/websr-loader.js"></script>
+<script src="./vendor/mp4box.all.min.js"></script>
+<script src="./vendor/webm-muxer.js"></script>
+<script src="./main.js"></script>
+
+<script>
+  (function () {
+    const params = new URLSearchParams(location.search);
+    const file_url = params.get('file');
+    if (!file_url) return;
+
+    // only allow same-origin relative paths — never http:// or file://
+    if (!file_url.startsWith('/video/')) {
+      console.log('__UPSCALE_DONE__ ' + JSON.stringify({
+        ok: false, error: 'auto-start: file must be a /video/ path'
+      }));
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await fetch(file_url);
+        if (!res.ok) throw new Error('fetch ' + res.status + ' for ' + file_url);
+        const blob = await res.blob();
+        if (blob.size === 0) throw new Error('empty file');
+        const name = file_url.split('/').pop() || 'input.mp4';
+        const file = new File([blob], name, { type: 'video/mp4' });
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const input = document.getElementById('file');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (e) {
+        console.log('__UPSCALE_DONE__ ' + JSON.stringify({
+          ok: false, error: 'auto-start: ' + (e.message || String(e))
+        }));
+      }
+    })();
+  })();
+</script>
+
+</body>
+</html>

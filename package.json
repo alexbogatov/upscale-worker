@@ -1,0 +1,13 @@
+{
+  "name": "anime4k-upscaler-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node worker.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.750.0",
+    "puppeteer-core": "^24.3.0"
+  }
+}
