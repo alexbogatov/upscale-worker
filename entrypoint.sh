@@ -73,6 +73,14 @@ export XDG_RUNTIME_DIR=/tmp/runtime-root
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
+# 3a. Set up worker directories (input + output)
+export WORK_DIR="${WORK_DIR:-/tmp/upscaler}"
+export OUTPUT_DIR="${OUTPUT_DIR:-/root/Downloads}"
+mkdir -p "$WORK_DIR" "$OUTPUT_DIR"
+rm -f "$OUTPUT_DIR"/*.webm 2>/dev/null || true
+echo "[Storage] WORK_DIR   = $WORK_DIR"
+echo "[Storage] OUTPUT_DIR = $OUTPUT_DIR"
+
 echo "[Display] Starting Xvfb on :99..."
 rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
 Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
@@ -83,13 +91,17 @@ until [ -S /tmp/.X11-unix/X99 ]; do
 done
 echo "[Display] Xvfb is ready on DISPLAY=:99."
 
-# 3b. Verify Vulkan/GPU is visible to the renderer
-echo "[Display] Verifying Vulkan ICD..."
+# 3b. HARD GATE: Vulkan must be present. No software fallback.
+echo "[Vulkan] Verifying NVIDIA hardware Vulkan..."
 if ! env -u DISPLAY XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" vulkaninfo --summary 2>/dev/null | grep -q "NVIDIA"; then
-    echo "[Display Warning] Vulkan device not detected — WebGPU may fall back to software."
-else
-    echo "[Display] NVIDIA Vulkan device verified successfully."
+    echo "[Vulkan] FATAL: NVIDIA Vulkan device not detected."
+    echo "[Vulkan] Dumping ICD state for diagnosis:"
+    ls -la /etc/vulkan/icd.d/ 2>/dev/null || true
+    ldconfig -p | grep -iE "libEGL|libGLX_nvidia|libvulkan" || true
+    kill -9 $XVFB_PID 2>/dev/null || true
+    exit 1
 fi
+echo "[Vulkan] NVIDIA hardware Vulkan verified."
 
 # 4. Launch Worker Loop
 export DISPLAY=:99

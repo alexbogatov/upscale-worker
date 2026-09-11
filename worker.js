@@ -357,6 +357,7 @@ const run_upscale = async (filename) => {
   await cdp.send('Page.setDownloadBehavior', {
     behavior: 'allow',
     downloadPath: OUTPUT_DIR,
+    eventsEnabled: true,
   });
 
   return new Promise(async (resolve, reject) => {
