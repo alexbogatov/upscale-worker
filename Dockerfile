@@ -2,7 +2,7 @@ FROM node:20-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. System packages, Chrome runtime libraries, tools, and Xvfb
+# 1. System packages, Chrome runtime libraries, tools, Xvfb, and Vulkan
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget curl gnupg \
     fonts-liberation \
@@ -11,10 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 \
     libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 \
     libxfixes3 libxkbcommon0 libxrandr2 libxshmfence1 \
+    libvulkan1 vulkan-tools \
     xdg-utils xvfb procps \
  && rm -rf /var/lib/apt/lists/*
 
-# 2. Chrome from Google's apt repo
+# 2. Chrome from Google's official repo
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub \
       | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
  && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
@@ -23,21 +24,12 @@ RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub \
  && apt-get install -y google-chrome-stable --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
-# 3. Vulkan loader from LunarG
-RUN wget -q -O - https://packages.lunarg.com/lunarg-signing-key-pub.asc \
-      | gpg --dearmor -o /usr/share/keyrings/lunarg.gpg \
- && echo "deb [signed-by=/usr/share/keyrings/lunarg.gpg] https://packages.lunarg.com/vulkan bookworm main" \
-      > /etc/apt/sources.list.d/lunarg-vulkan.list \
- && apt-get update \
- && apt-get install -y libvulkan1 vulkan-tools \
- && rm -rf /var/lib/apt/lists/*
-
-# 4. App directory and Node dependencies
+# 3. App directory and Node dependencies
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# 5. App source files
+# 4. App source files
 COPY worker.js entrypoint.sh ./
 COPY upscaler/ ./upscaler/
 
