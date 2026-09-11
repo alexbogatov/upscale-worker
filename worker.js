@@ -180,7 +180,8 @@ const launch_browser = async () => {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--use-angle=vulkan',
-      '--enable-features=Vulkan,DefaultANGLEVulkan,VulkanFromANGLE',
+      '--enable-features=Vulkan',
+      '--disable-vulkan-surface',
       '--enable-unsafe-webgpu',
       '--disable-web-security',
     ]
