@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxfixes3 libxkbcommon0 libxrandr2 libxshmfence1 \
     libvulkan1 vulkan-tools \
     libegl1 libglvnd0 libglx0 \
+    libgl1 libglx-mesa0 libegl-mesa0 libglapi-mesa \
+    strace \
     xdg-utils xvfb procps \
  && rm -rf /var/lib/apt/lists/*
 
@@ -52,14 +54,14 @@ RUN mkdir -p /etc/vulkan/icd.d && \
       '  "file_format_version": "1.0.0",' \
       '  "ICD": {' \
       '    "library_path": "libGLX_nvidia.so.0",' \
-      '    "api_version": "1.3.275"' \
+      '    "api_version": "1.4.329"' \
       '  }' \
       '}' > /etc/vulkan/icd.d/nvidia_icd.json && \
     cat /etc/vulkan/icd.d/nvidia_icd.json
 
-# Tell the loader explicitly. Harmless if the toolkit already sets these.
+# Tell the loader explicitly. VK_ICD_FILENAMES is deliberately NOT set: it is
+# deprecated and only earns a loader warning. VK_DRIVER_FILES supersedes it.
 ENV VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json
-ENV VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
 
 ENV DISPLAY=:99
 ENV XDG_RUNTIME_DIR=/tmp/runtime-root
