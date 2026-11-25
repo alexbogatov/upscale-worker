@@ -118,13 +118,58 @@ ICD_JSON
     fi
 fi
 
+# 3b-egl. Opt-in EGL ICD. libEGL_nvidia is also a complete Vulkan ICD and, unlike
+# libGLX_nvidia, does not initialise the X11/GLX client path - which is what
+# makes vkCreateInstance return NULL in minimal containers. The deploy script
+# sets RTX_USE_EGL_ICD=1 only when it has proven this strategy works.
+if [ "${RTX_USE_EGL_ICD:-0}" = "1" ]; then
+    EGL_ICD=/tmp/egl_icd.d/nvidia_icd.json
+    mkdir -p "$(dirname "$EGL_ICD")"
+    cat > "$EGL_ICD" <<'EGL_JSON'
+{
+  "file_format_version": "1.0.0",
+  "ICD": {
+    "library_path": "libEGL_nvidia.so.0",
+    "api_version": "1.4.329"
+  }
+}
+EGL_JSON
+    export VK_DRIVER_FILES="$EGL_ICD"
+    unset VK_ICD_FILENAMES
+    echo "[Vulkan] using EGL ICD: $EGL_ICD"
+fi
+
 # 3c. HARD GATE: Vulkan must be present. No software fallback.
 echo "[Vulkan] Verifying NVIDIA hardware Vulkan..."
 if ! env -u DISPLAY XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" vulkaninfo --summary 2>/dev/null | grep -q "NVIDIA"; then
     echo "[Vulkan] FATAL: NVIDIA Vulkan device not detected."
-    echo "[Vulkan] Dumping ICD state for diagnosis:"
-    ls -la /etc/vulkan/icd.d/ 2>/dev/null || true
-    ldconfig -p | grep -iE "libEGL|libGLX_nvidia|libvulkan" || true
+    echo "[Vulkan] ================ DIAGNOSTICS ================"
+    echo "[Vulkan] --- loader env:"
+    echo "    VK_DRIVER_FILES    = ${VK_DRIVER_FILES:-<unset>}"
+    echo "    VK_ICD_FILENAMES   = ${VK_ICD_FILENAMES:-<unset>}"
+    echo "    NVIDIA_DRIVER_CAPS = ${NVIDIA_DRIVER_CAPABILITIES:-<unset>}"
+    echo "[Vulkan] --- icd dirs:"
+    ls -la /etc/vulkan/icd.d/ /usr/share/vulkan/icd.d/ 2>/dev/null || true
+    echo "[Vulkan] --- manifest contents:"
+    for m in /etc/vulkan/icd.d/*.json /tmp/egl_icd.d/*.json; do
+        [ -e "$m" ] && { echo "    [$m]"; sed 's/^/      /' "$m"; }
+    done
+    echo "[Vulkan] --- nvidia libs present:"
+    ls /usr/lib/x86_64-linux-gnu/lib*nvidia*so* /usr/lib/x86_64-linux-gnu/libGLX_nvidia* /usr/lib/x86_64-linux-gnu/libEGL_nvidia* 2>/dev/null | head -30 || true
+    echo "[Vulkan] --- device nodes:"
+    ls -la /dev/nvidia* 2>/dev/null || echo "    (none)"
+    echo "[Vulkan] --- loader debug (why vkCreateInstance fails):"
+    VK_LOADER_DEBUG=error,warn env -u DISPLAY XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+        vulkaninfo --summary 2>&1 | grep -iE "error|fail|could not|unable" | head -15 || true
+    echo "[Vulkan] --- strace of files the driver tries to open:"
+    if command -v strace >/dev/null 2>&1; then
+        env -u DISPLAY XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+            strace -f -e trace=%file vulkaninfo --summary 2>&1 \
+            | grep ENOENT | grep -iE "\.so|nvidia|glx|egl|dri" | sort -u | tail -20 || true
+    else
+        echo "    (strace not installed - rebuild image with strace to see this)"
+    fi
+    echo "[Vulkan] ============================================="
     kill -9 $XVFB_PID 2>/dev/null || true
     exit 1
 fi
