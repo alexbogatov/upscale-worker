@@ -184,6 +184,12 @@ const launch_browser = async () => {
       '--enable-features=Vulkan',
       '--disable-vulkan-surface',
       '--enable-unsafe-webgpu',
+      // Dawn (Chrome's WebGPU engine) keeps its OWN adapter blocklist, separate
+      // from Chrome's GPU blocklist, and it rejects newer NVIDIA drivers by
+      // default. Without these, vulkaninfo can report the GPU while
+      // navigator.gpu.requestAdapter() still resolves to null (driver 595.x).
+      '--enable-dawn-features=allow_unsafe_apis,disable_adapter_blocklist',
+      '--disable-dawn-features=disallow_unsafe_apis',
     ]
   });
 
