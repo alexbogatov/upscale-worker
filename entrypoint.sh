@@ -91,7 +91,34 @@ until [ -S /tmp/.X11-unix/X99 ]; do
 done
 echo "[Display] Xvfb is ready on DISPLAY=:99."
 
-# 3b. HARD GATE: Vulkan must be present. No software fallback.
+# 3b. Repair the ICD manifest so its library_path names a file that EXISTS here.
+# The image ships a manifest pointing at libGLX_nvidia.so.0, but compute-only
+# hosts provide version-suffixed files (libGLX_nvidia.so.595.99.02) that the
+# deploy script mounts by that exact versioned path. A bare name would not
+# resolve, so rewrite the manifest to the concrete path we can actually find.
+ICD_FILE=/etc/vulkan/icd.d/nvidia_icd.json
+if [ -d /etc/vulkan/icd.d ]; then
+    GLX_REAL=""
+    for p in /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so* /usr/lib64/libGLX_nvidia.so* /usr/lib/libGLX_nvidia.so*; do
+        [ -e "$p" ] && GLX_REAL="$p" && break
+    done
+    if [ -n "$GLX_REAL" ]; then
+        echo "[Vulkan] ICD library_path -> $GLX_REAL"
+        cat > "$ICD_FILE" <<ICD_JSON
+{
+  "file_format_version": "1.0.0",
+  "ICD": {
+    "library_path": "$GLX_REAL",
+    "api_version": "1.3.275"
+  }
+}
+ICD_JSON
+    else
+        echo "[Vulkan] WARNING: no libGLX_nvidia.so* found; leaving manifest as shipped."
+    fi
+fi
+
+# 3c. HARD GATE: Vulkan must be present. No software fallback.
 echo "[Vulkan] Verifying NVIDIA hardware Vulkan..."
 if ! env -u DISPLAY XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" vulkaninfo --summary 2>/dev/null | grep -q "NVIDIA"; then
     echo "[Vulkan] FATAL: NVIDIA Vulkan device not detected."
