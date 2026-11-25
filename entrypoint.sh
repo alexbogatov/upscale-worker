@@ -92,37 +92,39 @@ done
 echo "[Display] Xvfb is ready on DISPLAY=:99."
 
 # 3b. Repair the ICD manifest so its library_path names a file that EXISTS here.
-# The image ships a manifest pointing at libGLX_nvidia.so.0, but compute-only
-# hosts provide version-suffixed files (libGLX_nvidia.so.595.99.02) that the
-# deploy script mounts by that exact versioned path. A bare name would not
-# resolve, so rewrite the manifest to the concrete path we can actually find.
+# The image ships an EGL-based manifest (libEGL_nvidia.so.0). libGLX_nvidia is
+# NOT used as the default because its ICD entry point requires an X11/GLX client
+# context and returns NULL in a minimal container -> "Found no drivers!". Only
+# rewrite when the manifest is missing or still points at GLX.
 ICD_FILE=/etc/vulkan/icd.d/nvidia_icd.json
 if [ -d /etc/vulkan/icd.d ]; then
-    GLX_REAL=""
-    for p in /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so* /usr/lib64/libGLX_nvidia.so* /usr/lib/libGLX_nvidia.so*; do
-        [ -e "$p" ] && GLX_REAL="$p" && break
-    done
-    if [ -n "$GLX_REAL" ]; then
-        echo "[Vulkan] ICD library_path -> $GLX_REAL"
-        cat > "$ICD_FILE" <<ICD_JSON
+    if [ ! -f "$ICD_FILE" ] || ! grep -q 'libEGL_nvidia' "$ICD_FILE" 2>/dev/null; then
+        EGL_REAL=""
+        for p in /usr/lib/x86_64-linux-gnu/libEGL_nvidia.so* /usr/lib64/libEGL_nvidia.so* /usr/lib/libEGL_nvidia.so*; do
+            [ -e "$p" ] && EGL_REAL="$p" && break
+        done
+        if [ -n "$EGL_REAL" ]; then
+            echo "[Vulkan] ICD library_path -> $EGL_REAL"
+            cat > "$ICD_FILE" <<ICD_JSON
 {
   "file_format_version": "1.0.0",
   "ICD": {
-    "library_path": "$GLX_REAL",
-    "api_version": "1.3.275"
+    "library_path": "$EGL_REAL",
+    "api_version": "1.4.329"
   }
 }
 ICD_JSON
-    else
-        echo "[Vulkan] WARNING: no libGLX_nvidia.so* found; leaving manifest as shipped."
+        else
+            echo "[Vulkan] WARNING: no libEGL_nvidia.so* found; leaving manifest as shipped."
+        fi
     fi
 fi
 
 # 3b-egl. Opt-in EGL ICD. libEGL_nvidia is also a complete Vulkan ICD and, unlike
 # libGLX_nvidia, does not initialise the X11/GLX client path - which is what
-# makes vkCreateInstance return NULL in minimal containers. The deploy script
-# sets RTX_USE_EGL_ICD=1 only when it has proven this strategy works.
-if [ "${RTX_USE_EGL_ICD:-0}" = "1" ]; then
+# makes vkCreateInstance return NULL in minimal containers. EGL is therefore the
+# DEFAULT; set RTX_USE_EGL_ICD=0 to opt back into the GLX manifest for debugging.
+if [ "${RTX_USE_EGL_ICD:-1}" = "1" ]; then
     EGL_ICD=/tmp/egl_icd.d/nvidia_icd.json
     mkdir -p "$(dirname "$EGL_ICD")"
     cat > "$EGL_ICD" <<'EGL_JSON'
